@@ -1,0 +1,70 @@
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+
+Adafruit_MPU6050 mpu;
+
+
+const float ACCEL_OFFSET_X = 0.3748;
+const float ACCEL_OFFSET_Y = -0.3252;
+const float ACCEL_OFFSET_Z = -21.3380; 
+
+const float GYRO_OFFSET_X = -0.0668;
+const float GYRO_OFFSET_Y = -0.0101;
+const float GYRO_OFFSET_Z = -0.0063;
+
+const int LED_PIN = 15; 
+
+void setup() {
+  Serial.begin(115200);
+
+  if (!mpu.begin()) {
+    Serial.println("MPU6050 not found!");
+    while (1);
+  }
+
+  pinMode(LED_PIN, OUTPUT); 
+  digitalWrite(LED_PIN, LOW); 
+
+  Serial.println("MPU6050 ready!");
+}
+
+void loop() {
+  sensors_event_t accel, gyro, temp;
+  mpu.getEvent(&accel, &gyro, &temp);
+
+
+  float ax = accel.acceleration.x - ACCEL_OFFSET_X;
+  float ay = accel.acceleration.y - ACCEL_OFFSET_Y;
+  float az = accel.acceleration.z - ACCEL_OFFSET_Z;
+
+  float gx = gyro.gyro.x - GYRO_OFFSET_X;
+  float gy = gyro.gyro.y - GYRO_OFFSET_Y;
+  float gz = gyro.gyro.z - GYRO_OFFSET_Z;
+
+  Serial.print("Accel (Calibrated): ");
+  Serial.print(ax); Serial.print(", ");
+  Serial.print(ay); Serial.print(", ");
+  Serial.print(az); Serial.println(" m/s^2");
+
+  Serial.print("Gyro (Calibrated): ");
+  Serial.print(gx); Serial.print(", ");
+  Serial.print(gy); Serial.print(", ");
+  Serial.print(gz); Serial.println(" rad/s");
+
+  Serial.print("Temp: ");
+  Serial.print(temp.temperature); Serial.println(" °C");
+
+  
+  if (ax > 1.0 || ax < -1.0) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(100); 
+    digitalWrite(LED_PIN, LOW);
+    delay(100); 
+  } else {
+    digitalWrite(LED_PIN, LOW); 
+    delay(500);
+  }
+
+  Serial.println();
+}

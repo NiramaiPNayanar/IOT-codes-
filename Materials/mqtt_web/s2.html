@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MQTT LED Receiver</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+  <h2>MQTT LED Status</h2>
+  <button onclick="startReceiving()">Start Receiving</button>
+  <p>Status: <span id="ledStatus">Not Connected</span></p>
+
+  <script>
+    const client = mqtt.connect("ws://localhost:8083/mqtt");
+    const statusElement = document.getElementById("ledStatus");
+
+    client.on("connect", function () {
+      console.log("Connected to broker (subscriber)");
+      statusElement.textContent = "Connected to broker";
+    });
+
+    function startReceiving() {
+      client.subscribe("esp/led", function (err) {
+        if (!err) {
+          console.log("Subscribed to topic: esp/led");
+          statusElement.textContent = "Subscribed to esp/led";
+        } else {
+          console.error("Subscribe error:", err);
+        }
+      });
+    }
+
+    client.on("message", function (topic, message) {
+      console.log("Message received:", topic, message.toString());
+      if (topic === "esp/led") {
+        const value = message.toString();
+        if (value === "1") {
+          statusElement.textContent = "LED is ON";
+        } else if (value === "0") {
+          statusElement.textContent = "LED is OFF";
+        } else {
+          statusElement.textContent = "Unknown message: " + value;
+        }
+      }
+    });
+  </script>
+</body>
+</html>

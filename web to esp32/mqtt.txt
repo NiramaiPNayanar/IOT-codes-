@@ -1,0 +1,74 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+// Wi-Fi credentials
+const char* ssid = "WhyBhav";
+const char* password = "meowmeownigga";
+
+// MQTT broker settings
+const char* mqtt_server = "192.168.113.163"; // PC IP address
+const int mqtt_port = 1883;
+const char* mqtt_topic = "esp32/led"; // Topic to listen to
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+const int ledPin = 4;  // Change if your onboard LED is on a different GPIO
+
+void callback(char* topic, byte* message, unsigned int length) {
+  String msg;
+  for (int i = 0; i < length; i++) {
+    msg += (char)message[i];
+  }
+  Serial.print("MQTT Message: ");
+  Serial.println(msg);
+
+  if (msg == "on") {
+    digitalWrite(ledPin, HIGH);
+  } else if (msg == "off") {
+    digitalWrite(ledPin, LOW);
+  } else if (msg == "toggle") {
+    digitalWrite(ledPin, !digitalRead(ledPin));
+  }
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    if (client.connect("ESP32Client")) {
+      Serial.println("connected");
+      client.subscribe(mqtt_topic);
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retrying in 5s...");
+      delay(5000);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" connected!");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+}

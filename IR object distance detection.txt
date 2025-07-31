@@ -1,0 +1,17 @@
+#define IR_SENSOR_PIN 27
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  int sensorValue = analogRead(IR_SENSOR_PIN);
+
+  float distance = 1234.85 * pow(sensorValue, -1.15); 
+
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+
+  delay(500);
+}

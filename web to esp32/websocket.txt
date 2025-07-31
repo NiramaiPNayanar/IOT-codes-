@@ -1,0 +1,58 @@
+#include <WiFi.h>
+#include <WebSocketsServer.h>
+#include <ESPAsyncWebServer.h>
+
+// Replace with your network credentials
+const char* ssid = "Hotspot";
+const char* password = "123456789";
+
+const int ledPin = 4;  // On-board LED
+WebSocketsServer webSocket = WebSocketsServer(81);
+AsyncWebServer server(80);
+
+String htmlPage = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head><title>LED Control</title></head>
+<body>
+<h2>ESP32 WebSocket LED Control</h2>
+<button onclick="toggleLED()">Toggle LED</button>
+<script>
+  var socket = new WebSocket("ws://" + location.hostname + ":81/");
+  function toggleLED() {
+    socket.send("toggle");
+  }
+</script>
+</body>
+</html>
+)rawliteral";
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("WiFi connected: " + WiFi.localIP().toString());
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/html", htmlPage);
+  });
+  server.begin();
+
+  webSocket.begin();
+  webSocket.onEvent([](uint8_t num, WStype_t type, uint8_t * payload, size_t length){
+    if (type == WStype_TEXT) {
+      if (strcmp((char*)payload, "toggle") == 0) {
+        digitalWrite(ledPin, !digitalRead(ledPin));
+      }
+    }
+  });
+}
+
+void loop() {
+  webSocket.loop();
+}

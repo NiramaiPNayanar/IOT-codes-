@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32 MQTT WebSocket Client</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #messages { border: 1px solid #ccc; padding: 10px; min-height: 200px; overflow-y: scroll; margin-top: 10px; }
+        .publish-section, .subscribe-section { margin-bottom: 20px; }
+        input[type="text"] { width: 300px; padding: 8px; margin-right: 10px; }
+        button { padding: 8px 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>ESP32 MQTT WebSocket Interface</h1>
+
+    <div class="connection-status">
+        <p>Status: <span id="status" style="color: red;">Disconnected</span></p>
+    </div>
+
+    <div class="publish-section">
+        <h2>Publish Message to ESP32</h2>
+        <input type="text" id="publishTopic" value="pc/control" placeholder="Topic to publish" />
+        <input type="text" id="publishMessage" placeholder="Message to send" />
+        <button onclick="publishMessage()">Publish</button>
+    </div>
+
+    <div class="subscribe-section">
+        <h2>Messages from ESP32 (<span id="subscribedTopic">esp32/data</span>)</h2>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        // --- MQTT Broker Settings for Webpage ---
+        const brokerUrl = 'ws://192.168.182.20:9001'; // Use ws:// for unsecure WebSocket, wss:// for secure
+        const clientId = 'WebClient-' + Math.random().toString(16).substr(2, 8); // Unique client ID
+
+        const esp32PublishTopic = 'pc/control'; // Topic for PC to send to ESP32
+        const esp32SubscribeTopic = 'esp32/data'; // Topic for PC to receive from ESP32
+
+        let client;
+
+        function connectMqtt() {
+            client = mqtt.connect(brokerUrl, { clientId: clientId });
+
+            client.on('connect', () => {
+                console.log('Connected to MQTT broker via WebSockets!');
+                document.getElementById('status').innerText = 'Connected';
+                document.getElementById('status').style.color = 'green';
+                client.subscribe(esp32SubscribeTopic, (err) => {
+                    if (!err) {
+                        console.log(`Subscribed to ${esp32SubscribeTopic}`);
+                        document.getElementById('subscribedTopic').innerText = esp32SubscribeTopic;
+                    } else {
+                        console.error('Subscription error:', err);
+                    }
+                });
+            });
+
+            client.on('message', (topic, message) => {
+                const messagesDiv = document.getElementById('messages');
+                const p = document.createElement('p');
+                p.textContent = `[${topic}] ${message.toString()}`;
+                messagesDiv.prepend(p); // Add new messages to the top
+                // Keep scroll at bottom if it was already at bottom, or allow user to scroll up
+                // messagesDiv.scrollTop = messagesDiv.scrollHeight; // Uncomment to auto-scroll to bottom
+            });
+
+            client.on('close', () => {
+                console.log('Disconnected from MQTT broker.');
+                document.getElementById('status').innerText = 'Disconnected';
+                document.getElementById('status').style.color = 'red';
+            });
+
+            client.on('error', (err) => {
+                console.error('MQTT error:', err);
+                document.getElementById('status').innerText = 'Error';
+                document.getElementById('status').style.color = 'orange';
+            });
+        }
+
+        function publishMessage() {
+            const topic = document.getElementById('publishTopic').value;
+            const message = document.getElementById('publishMessage').value;
+            if (client && client.connected) {
+                client.publish(topic, message, (err) => {
+                    if (!err) {
+                        console.log(`Published to ${topic}: ${message}`);
+                        document.getElementById('publishMessage').value = ''; // Clear input
+                    } else {
+                        console.error('Publish error:', err);
+                    }
+                });
+            } else {
+                alert('Not connected to MQTT broker.');
+            }
+        }
+
+        // Initialize connection when page loads
+        window.onload = connectMqtt;
+    </script>
+</body>
+</html>

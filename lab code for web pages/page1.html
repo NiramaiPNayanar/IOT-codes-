@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Web Page 1</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+       body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f8fafc; /* Softer light background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    width: 50%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.message-area {
+    background-color: #f1f5f9;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    min-height: 150px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #d1d5db;
+}
+
+.message-input {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.message-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+
+.send-button {
+    background-color: #2563eb;
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    font-size: 1rem;
+}
+
+.send-button:hover {
+    background-color: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+.send-button:active {
+    transform: translateY(0);
+}
+
+.status-text {
+    font-size: 0.875rem;
+    color: #64748b;
+    text-align: center;
+}
+
+.message-bubble {
+    background-color: #e0f2fe;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    word-wrap: break-word;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.message-bubble strong {
+    color: #1e40af;
+    font-weight: 600;
+}
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800">Page 1</h1>
+        <div id="status" class="status-text">Connecting...</div>
+        <div id="messages" class="message-area shadow-inner">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="flex flex-col gap-3">
+            <input type="text" id="messageInput" class="message-input" placeholder="Type your message...">
+            <button id="sendButton" class="send-button shadow-md">Send Message</button>
+        </div>
+    </div>
+
+    <!-- MQTT.js CDN -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script>
+    
+        const brokerHost = 'localhost'; // Mosquitto running locally
+        const brokerPort = 8083; // Default secure WebSocket port for Mosquitto
+        const protocol = 'ws'; // Use 'ws' for non-secure WebSocket
+        const brokerPath = ''; // Path for WebSockets (often '/mqtt' or empty depending on Mosquitto config)
+        const topic = 'web_mqtt_chat_channel'; // Common topic for communication
+
+        // Generate a unique client ID for this page
+        const clientId = 'mqtt_page1_' + Math.random().toString(16).substr(2, 8);
+
+        // Get DOM elements
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+
+        let client;
+
+        /**
+         * Initializes the MQTT client and connects to the broker.
+         */
+        function connectMqtt() {
+            statusDiv.textContent = 'Connecting to MQTT broker...';
+            try {
+            client = mqtt.connect(`${protocol}://${brokerHost}:${brokerPort}${brokerPath}`, {
+    clientId: clientId,
+    clean: true, // Clear previous session on reconnect
+    reconnectPeriod: 1000,
+    connectTimeout: 30 * 1000,
+
+});
+
+                // Event listener for successful connection
+                client.on('connect', () => {
+                    statusDiv.textContent = `Connected as ${clientId}`;
+                    console.log('Connected to MQTT broker!');
+                    // Subscribe to the topic once connected
+                    client.subscribe(topic, (err) => {
+                        if (!err) {
+                            console.log(`Subscribed to topic: ${topic}`);
+                        } else {
+                            console.error('Subscription error:', err);
+                            statusDiv.textContent = `Subscription failed: ${err.message}`;
+                        }
+                    });
+                });
+
+                // Event listener for incoming messages
+                client.on('message', (receivedTopic, message) => {
+                    // Check if the message is from the subscribed topic
+                    if (receivedTopic === topic) {
+                        const msg = message.toString();
+                        console.log(`Received message: ${msg}`);
+                        try {
+                            const parsedMessage = JSON.parse(msg);
+                            // Display the message in the messages div
+                            const messageBubble = document.createElement('div');
+                            messageBubble.className = 'message-bubble';
+                            messageBubble.innerHTML = `<strong>${parsedMessage.senderId}:</strong> ${parsedMessage.message}`;
+                            messagesDiv.appendChild(messageBubble);
+                            // Scroll to the bottom of the messages div
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        } catch (e) {
+                            console.error("Failed to parse message:", e);
+                            // Fallback for non-JSON messages
+                            const messageBubble = document.createElement('div');
+                            messageBubble.className = 'message-bubble';
+                            messageBubble.textContent = `Raw: ${msg}`;
+                            messagesDiv.appendChild(messageBubble);
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        }
+                    }
+                });
+
+                // Event listener for errors
+                client.on('error', (err) => {
+                    console.error('MQTT error:', err);
+                    statusDiv.textContent = `Error: ${err.message}`;
+                    client.end(); // End client on error to prevent continuous reconnect attempts if severe
+                });
+
+                // Event listener for disconnect
+                client.on('close', () => {
+                    statusDiv.textContent = 'Disconnected.';
+                    console.log('Disconnected from MQTT broker.');
+                });
+
+                // Event listener for offline
+                client.on('offline', () => {
+                    statusDiv.textContent = 'Offline. Reconnecting...';
+                    console.log('MQTT client is offline.');
+                });
+
+                // Event listener for reconnect
+                client.on('reconnect', () => {
+                    statusDiv.textContent = 'Reconnecting...';
+                    console.log('Attempting to reconnect to MQTT broker...');
+                });
+
+            } catch (e) {
+                console.error("Error connecting to MQTT:", e);
+                statusDiv.textContent = `Connection setup error: ${e.message}`;
+            }
+        }
+
+        /**
+         * Publishes a message to the MQTT topic.
+         */
+        function publishMessage() {
+            const messageText = messageInput.value.trim();
+            if (messageText) {
+                const messagePayload = {
+                    senderId: clientId,
+                    message: messageText,
+                    timestamp: new Date().toISOString()
+                };
+                const messageString = JSON.stringify(messagePayload);
+
+                client.publish(topic, messageString, { qos: 0, retain: false }, (err) => {
+                    if (err) {
+                        console.error('Publish error:', err);
+                        statusDiv.textContent = `Publish failed: ${err.message}`;
+                    } else {
+                        console.log(`Message published: ${messageString}`);
+                        // Optionally, display your own sent message immediately
+                        const messageBubble = document.createElement('div');
+                        messageBubble.className = 'message-bubble bg-blue-100 text-right ml-auto'; // Style for sent messages
+                        messageBubble.innerHTML = `<strong>You (${clientId}):</strong> ${messageText}`;
+                        messagesDiv.appendChild(messageBubble);
+                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        messageInput.value = ''; // Clear input field
+                    }
+                });
+            }
+        }
+
+        // Add event listener to the send button
+        sendButton.addEventListener('click', publishMessage);
+
+        // Allow sending message with Enter key
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                publishMessage();
+            }
+        });
+
+        // Initialize MQTT connection when the page loads
+        window.onload = connectMqtt;
+    </script>
+</body>
+</html>

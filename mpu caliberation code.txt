@@ -1,0 +1,56 @@
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+
+Adafruit_MPU6050 mpu;
+
+void setup() {
+  Serial.begin(115200);
+
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+    while (1);
+  }
+
+  Serial.println("Starting calibration. Keep the sensor still...");
+
+  // Take 100 samples to compute average offset
+  const int samples = 100;
+  float ax = 0, ay = 0, az = 0;
+  float gx = 0, gy = 0, gz = 0;
+
+  for (int i = 0; i < samples; i++) {
+    sensors_event_t accel, gyro, temp;
+    mpu.getEvent(&accel, &gyro, &temp);
+
+    ax += accel.acceleration.x;
+    ay += accel.acceleration.y;
+    az += accel.acceleration.z;
+
+    gx += gyro.gyro.x;
+    gy += gyro.gyro.y;
+    gz += gyro.gyro.z;
+
+    delay(50); // slight delay between samples
+  }
+
+  ax /= samples;
+  ay /= samples;
+  az /= samples;
+  gx /= samples;
+  gy /= samples;
+  gz /= samples;
+
+  // Print the calculated offsets
+  Serial.println("Calibration complete. Offsets:");
+  Serial.print("Accel Offset X: "); Serial.println(ax, 4);
+  Serial.print("Accel Offset Y: "); Serial.println(ay, 4);
+  Serial.print("Accel Offset Z: "); Serial.println(az, 4);
+  Serial.print("Gyro Offset X: "); Serial.println(gx, 4);
+  Serial.print("Gyro Offset Y: "); Serial.println(gy, 4);
+  Serial.print("Gyro Offset Z: "); Serial.println(gz, 4);
+}
+
+void loop() {
+  // Empty. Just use the offsets printed in setup()
+}

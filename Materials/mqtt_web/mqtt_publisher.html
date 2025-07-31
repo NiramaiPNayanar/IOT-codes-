@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Publisher</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .quick-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .quick-btn {
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .quick-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MQTT Publisher</h1>
+        
+        <div class="form-group">
+            <label for="brokerUrl">Broker URL:</label>
+            <input type="text" id="brokerUrl" value="ws://localhost:8083">
+        </div>
+        
+        <div class="form-group">
+            <label for="clientId">Client ID:</label>
+            <input type="text" id="clientId" value="publisher_">
+        </div>
+        
+        <button onclick="toggleConnection()" id="connectBtn">Connect</button>
+        
+        <div class="status disconnected" id="status">Disconnected</div>
+        
+        <div class="form-group">
+            <label for="topic">Topic:</label>
+            <input type="text" id="topic" value="home/light/command" disabled>
+        </div>
+        
+        <div class="form-group">
+            <label for="message">Message:</label>
+            <input type="text" id="message" value="ON" disabled>
+        </div>
+        
+        <button onclick="publishMessage()" id="publishBtn" disabled>Publish Message</button>
+        
+        <div class="quick-buttons">
+            <button class="quick-btn" onclick="quickPublish('home/light/command', 'ON')" disabled id="lightOn">Light ON</button>
+            <button class="quick-btn" onclick="quickPublish('home/light/command', 'OFF')" disabled id="lightOff">Light OFF</button>
+            <button class="quick-btn" onclick="quickPublish('home/fan/command', 'ON')" disabled id="fanOn">Fan ON</button>
+            <button class="quick-btn" onclick="quickPublish('home/fan/command', 'OFF')" disabled id="fanOff">Fan OFF</button>
+            <button class="quick-btn" onclick="quickPublish('home/door/command', 'OPEN')" disabled id="doorOpen">Door OPEN</button>
+            <button class="quick-btn" onclick="quickPublish('home/door/command', 'CLOSE')" disabled id="doorClose">Door CLOSE</button>
+        </div>
+    </div>
+
+    <script>
+        let client = null;
+        let isConnected = false;
+
+        // Generate unique client ID
+        document.getElementById('clientId').value;
+
+        function toggleConnection() {
+            if (!isConnected) {
+                connect();
+            } else {
+                disconnect();
+            }
+        }
+
+        function connect() {
+            const brokerUrl = document.getElementById('brokerUrl').value;
+            const clientId = document.getElementById('clientId').value;
+            
+            try {
+                const url = new URL(brokerUrl);
+                const host = url.hostname;
+                const port = parseInt(url.port) || 8083;
+                
+                client = new Paho.MQTT.Client(host, port, clientId);
+                
+                client.onConnectionLost = onConnectionLost;
+                
+                const options = {
+                    useSSL: url.protocol === 'wss:',
+                    onSuccess: onConnect,
+                    onFailure: onFailure
+                };
+                
+                updateStatus('Connecting...', false);
+                client.connect(options);
+                
+            } catch (error) {
+                updateStatus('Connection failed: ' + error.message, false);
+            }
+        }
+
+        function disconnect() {
+            if (client && isConnected) {
+                client.disconnect();
+                updateStatus('Disconnected', false);
+                isConnected = false;
+                updateButtons();
+            }
+        }
+
+        function onConnect() {
+            updateStatus('Connected', true);
+            isConnected = true;
+            updateButtons();
+        }
+
+        function onFailure(error) {
+            updateStatus('Connection failed: ' + error.errorMessage, false);
+        }
+
+        function onConnectionLost(responseObject) {
+            updateStatus('Connection lost: ' + responseObject.errorMessage, false);
+            isConnected = false;
+            updateButtons();
+        }
+
+        function updateStatus(message, connected) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${connected ? 'connected' : 'disconnected'}`;
+        }
+
+        function updateButtons() {
+            const connectBtn = document.getElementById('connectBtn');
+            const publishBtn = document.getElementById('publishBtn');
+            const topic = document.getElementById('topic');
+            const message = document.getElementById('message');
+            const quickBtns = document.querySelectorAll('.quick-btn');
+            
+            connectBtn.textContent = isConnected ? 'Disconnect' : 'Connect';
+            publishBtn.disabled = !isConnected;
+            topic.disabled = !isConnected;
+            message.disabled = !isConnected;
+            
+            quickBtns.forEach(btn => {
+                btn.disabled = !isConnected;
+            });
+        }
+
+        function publishMessage() {
+            const topic = document.getElementById('topic').value;
+            const message = document.getElementById('message').value;
+            
+            if (!client || !isConnected) {
+                alert('Not connected to broker');
+                return;
+            }
+            
+            const mqttMessage = new Paho.MQTT.Message(message);
+            mqttMessage.destinationName = topic;
+            client.send(mqttMessage);
+            
+            alert(`Published: ${message} to ${topic}`);
+        }
+
+        function quickPublish(topic, message) {
+            if (!client || !isConnected) {
+                alert('Not connected to broker');
+                return;
+            }
+            
+            const mqttMessage = new Paho.MQTT.Message(message);
+            mqttMessage.destinationName = topic;
+            client.send(mqttMessage);
+            
+            // Update the form fields
+            document.getElementById('topic').value = topic;
+            document.getElementById('message').value = message;
+            
+            alert(`Published: ${message} to ${topic}`);
+        }
+    </script>
+</body>
+</html>
