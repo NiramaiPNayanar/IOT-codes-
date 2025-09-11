@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ESP32 Hive Monitor</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    :root {
+      --bg:#0f172a; --panel:#111827; --muted:#94a3b8; --text:#e5e7eb;
+      --ok:#22c55e; --warn:#f59e0b; --accent:#22d3ee; --danger:#ef4444;
+    }
+    body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+    .container{max-width:900px;margin:0 auto}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .col-12{grid-column:span 12}.col-6{grid-column:span 6}.col-4{grid-column:span 4}
+    code{background:#0b1220;border:1px solid #1f2937;padding:2px 6px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+        <div>
+          <h1>ESP32 Hive Monitor</h1>
+          <div class="muted">Subscribing to <code id="topicLabel">esp32/hive</code></div>
+        </div>
+        <div class="pill"><span class="dot" id="dot"></span><span id="status">Disconnected</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="col-6">
+          <label class="muted">Broker Host (WebSocket)</label>
+          <input id="host" value="localhost" />
+        </div>
+        <div class="col-4">
+          <label class="muted">WS Port</label>
+          <input id="port" type="number" value="8083" />
+        </div>
+        <div class="col-2" style="display:flex;gap:8px;align-items:flex-end">
+          <button class="btn" id="connectBtn">Connect</button>
+        </div>
+        <div class="col-6">
+          <label class="muted">Topic</label>
+          <input id="topic" value="esp32/hive" />
+        </div>
+        <div class="col-6">
+          <label class="muted">Client ID</label>
+          <input id="clientId" placeholder="auto-generated if empty" />
+        </div>
+      </div>
+    </div>
+
+    <div id="banner" class="banner">Expand Hive Triggered</div>
+    <div id="danger" class="danger"> Warning: Hive Temperature Exceeds 30°C!</div>
+
+    <div class="row">
+      <div class="col-4"><div class="stat"><div class="muted">Temperature (°C)</div><div class="value" id="tVal">—</div></div></div>
+      <div class="col-4"><div class="stat"><div class="muted">Object Count</div><div class="value" id="cVal">—</div></div></div>
+      <div class="col-4"><div class="stat"><div class="muted">Message</div><div class="value" id="msgVal">—</div></div></div>
+    </div>
+
+    <div class="card">
+      <button class="btn" id="expandBtn">Send Expand Hive</button>
+      <button class="btn" id="resetBtn">Reset Count</button>
+    </div>
+
+    <div class="card">
+      <div class="muted" style="margin-bottom:6px">Raw (latest)</div>
+      <div class="log" id="raw">—</div>
+    </div>
+  </div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const setConn = ok => {
+    $("dot").style.background = ok ? "var(--ok)" : "#ef4444";
+    $("dot").style.boxShadow = ok ? "0 0 16px rgba(34,197,94,.75)" : "0 0 16px rgba(239,68,68,.75)";
+    $("status").textContent = ok ? "Connected" : "Disconnected";
+  };
+
+  let client = null;
+  let pubTopic = "";
+
+  $("connectBtn").addEventListener("click", () => {
+    try { if (client) client.end(true); } catch(e) {}
+    const host = $("host").value.trim();
+    const port = parseInt($("port").value.trim(), 10) || 8083;
+    pubTopic = $("topic").value.trim() || "esp32/hive";
+    const cid = $("clientId").value.trim() || `hive_${Math.random().toString(16).slice(2,8)}`;
+    $("clientId").value = cid;
+    $("topicLabel").textContent = pubTopic;
+
+    const url = `ws://${host}:${port}`;
+    client = mqtt.connect(url, { clientId: cid, keepalive: 30, reconnectPeriod: 2000, clean: true });
+
+    client.on("connect", () => { setConn(true); client.subscribe(pubTopic); });
+    client.on("close", () => setConn(false));
+    client.on("error", () => setConn(false));
+
+    client.on("message", (_t, payload) => {
+      const txt = payload.toString();
+      $("raw").textContent = txt;
+      try {
+        const obj = JSON.parse(txt);
+        if (typeof obj.temperature === "number") {
+          $("tVal").textContent = obj.temperature.toFixed(2);
+          $("danger").style.display = obj.temperature > 30 ? "block" : "none";  // ✅ Warning at >30°C
+        }
+        if (typeof obj.count === "number") $("cVal").textContent = obj.count;
+        const msg = (obj.message || "").toString();
+        $("msgVal").textContent = msg || "—";
+        $("banner").style.display = (msg === "Expand Hive") ? "block" : "none";
+      } catch (e) {}
+    });
+  });
+
+  $("expandBtn").addEventListener("click", () => {
+    if (client && client.connected && pubTopic) {
+      client.publish(pubTopic, JSON.stringify({ command: "expand hive" }));
+      $("banner").style.display = "block";
+      setTimeout(() => $("banner").style.display = "none", 3000);
+    }
+  });
+
+  $("resetBtn").addEventListener("click", () => {
+    if (client && client.connected && pubTopic) {
+      client.publish(pubTopic, JSON.stringify({ command: "reset" }));
+    }
+  });
+</script>
+
+</body>
+</html>
