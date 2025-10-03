@@ -1,9 +1,9 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-const char* ssid   = "<WIFI-NAME>";
-const char* pass   = "<WIFI-PASSWORD>";
-const char* server = "http://<ipv4 from ipconfig>/eval/insert.php";
+const char* ssid   = "<WiFi SSID>";
+const char* pass   = "WiFi Passwd";
+const char* server = "http://<ipv4 address>/eval/insert.php"; // find at cmd -> ipconfig -> Wireless LAN adapter Wi-Fi
 
 int irPin = 23;
 
