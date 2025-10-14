@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Live Temperature Sensor</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      background: #121212;
+      color: #00ffcc;
+      text-align: center;
+      padding-top: 60px;
+    }
+
+    .card {
+      background: #1e1e1e;
+      padding: 25px;
+      border-radius: 10px;
+      width: 320px;
+      margin: auto;
+      box-shadow: 0 0 15px rgba(0, 255, 200, 0.4);
+    }
+
+    h1 {
+      color: #0ff;
+    }
+
+    #temp {
+      font-size: 3em;
+      color: #00ff99;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Temperature Sensor Data</h1>
+  <h2 id="data">-- °C</h2>
+
+  <script>
+    const broker = "ws://172.20.10.5:8083"; // your PC IP
+    const topic = "sensor/temp";
+    const client = mqtt.connect(broker);
+    const dataEl = document.getElementById("data");
+
+    client.on("connect", () => {
+      console.log("Connected to MQTT broker");
+      client.subscribe(topic);
+    });
+
+    client.on("message", (t, message) => {
+      if (t === topic) {
+        dataEl.textContent = message.toString() + " °C";
+      }
+    });
+  </script>
+
+</body>
+
+</html>
