@@ -8,7 +8,7 @@ This repository contains sample IoT code for ESP32-based experiments, including:
 - Web server integration
 - Various sensor demos (LED, IR detection, accelerometer, temperature)
 
----
+--- 
 
 ## Table of Contents
 1. [Prerequisites](#prerequisites)  
