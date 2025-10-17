@@ -1,0 +1,74 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+const char* ssid = "Yokoso";
+const char* password = "why are you gay?";
+const char* serverName = "http://192.168.90.20/fin/insert.php";  
+
+#define ONE_WIRE_BUS 16   
+#define SLOT_SENSOR 17    
+#define LED_PIN 4         
+
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(SLOT_SENSOR, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  WiFi.begin(ssid, password);
+  Serial.println("Connecting to WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi Connected!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  sensors.begin();
+}
+
+void loop() {
+  sensors.requestTemperatures();
+  float temperatureC = sensors.getTempCByIndex(0);
+  int slotValue = digitalRead(SLOT_SENSOR);
+  String slotStatus = (slotValue == HIGH) ? "ON" : "OFF";
+
+  Serial.print("Temperature: ");
+  Serial.print(temperatureC);
+  Serial.print("°C | Slot: ");
+  Serial.println(slotStatus);
+
+  if (temperatureC > 31) {
+    digitalWrite(LED_PIN, HIGH);
+    Serial.println("ABNORMAL: Temperature above 31°C!");
+  } else {
+    digitalWrite(LED_PIN, LOW);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    String url = String(serverName) + "?temperature=" + String(temperatureC) + "&slot=" + slotStatus;
+    http.begin(url);
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode > 0) {
+      Serial.print("Data sent -> ");
+      Serial.println(url);
+      Serial.print("HTTP Response: ");
+      Serial.println(httpResponseCode);
+    } else {
+      Serial.print("Error sending data: ");
+      Serial.println(httpResponseCode);
+    }
+    http.end();
+  } else {
+    Serial.println("WiFi Disconnected!");
+  }
+
+  delay(5000);
+}
